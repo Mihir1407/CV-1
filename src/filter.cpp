@@ -1,0 +1,334 @@
+// filter.cpp
+// Name: Mihir Chitre
+// Date: 01/23/2024
+// Purpose: Contains image manipulation functions
+
+#include <opencv2/opencv.hpp>
+
+// Custom grayscale function with non-standard weights
+int greyscale(cv::Mat &src, cv::Mat &dst)
+{
+    if (src.empty() || src.channels() != 3)
+    {
+        return -1; // Return an error if conditions are not met
+    }
+
+    dst = cv::Mat(src.size(), src.type());
+
+    for (int y = 0; y < src.rows; y++)
+    {
+        for (int x = 0; x < src.cols; x++)
+        {
+            cv::Vec3b pixel = src.at<cv::Vec3b>(y, x);
+
+            // Custom weights for each channel
+            double blueWeight = 0.3;  // Arbitrary weight for blue channel
+            double greenWeight = 0.3; // Arbitrary weight for green channel
+            double redWeight = 0.4;   // Arbitrary weight for red channel
+
+            uchar grayValue = static_cast<uchar>(pixel[0] * blueWeight +
+                                                 pixel[1] * greenWeight +
+                                                 pixel[2] * redWeight);
+
+            dst.at<cv::Vec3b>(y, x) = cv::Vec3b(grayValue, grayValue, grayValue);
+        }
+    }
+
+    return 0; // Return 0 on success
+}
+
+// Function to apply a sepia tone to an image
+int sepiaTone(cv::Mat &src, cv::Mat &dst)
+{
+    if (src.empty() || src.channels() != 3)
+    {
+        return -1; // Return an error if conditions are not met
+    }
+
+    dst = cv::Mat(src.size(), src.type());
+
+    for (int y = 0; y < src.rows; y++)
+    {
+        for (int x = 0; x < src.cols; x++)
+        {
+            cv::Vec3b pixel = src.at<cv::Vec3b>(y, x);
+
+            // Original colors
+            float blue = pixel[0];
+            float green = pixel[1];
+            float red = pixel[2];
+
+            // Calculate new color values
+            float newRed = std::min(255.0f, 0.272f * red + 0.534f * green + 0.131f * blue);
+            float newGreen = std::min(255.0f, 0.349f * red + 0.686f * green + 0.168f * blue);
+            float newBlue = std::min(255.0f, 0.393f * red + 0.769f * green + 0.189f * blue);
+
+            dst.at<cv::Vec3b>(y, x) = cv::Vec3b(static_cast<uchar>(newBlue),
+                                                static_cast<uchar>(newGreen),
+                                                static_cast<uchar>(newRed));
+        }
+    }
+
+    return 0; // Return 0 on success
+}
+
+// Function to apply a 5x5 blur filter
+int blur5x5_1(cv::Mat &src, cv::Mat &dst)
+{
+    if (src.empty() || src.channels() != 3)
+    {
+        return -1; // Return an error if conditions are not met
+    }
+
+    // Copy src to dst
+    dst = src.clone();
+
+    // Gaussian kernel
+    int kernel[5][5] = {
+        {1, 2, 4, 2, 1},
+        {2, 4, 8, 4, 2},
+        {4, 8, 16, 8, 4},
+        {2, 4, 8, 4, 2},
+        {1, 2, 4, 2, 1}};
+    int kernelSum = 140; // Sum of kernel values
+
+    // Apply the blur filter
+    for (int y = 2; y < src.rows - 2; y++)
+    {
+        for (int x = 2; x < src.cols - 2; x++)
+        {
+            int sumB = 0, sumG = 0, sumR = 0;
+
+            for (int ky = -2; ky <= 2; ky++)
+            {
+                for (int kx = -2; kx <= 2; kx++)
+                {
+                    cv::Vec3b pixel = src.at<cv::Vec3b>(y + ky, x + kx);
+                    sumB += pixel[0] * kernel[ky + 2][kx + 2];
+                    sumG += pixel[1] * kernel[ky + 2][kx + 2];
+                    sumR += pixel[2] * kernel[ky + 2][kx + 2];
+                }
+            }
+
+            dst.at<cv::Vec3b>(y, x) = cv::Vec3b(
+                sumB / kernelSum,
+                sumG / kernelSum,
+                sumR / kernelSum);
+        }
+    }
+
+    return 0; // Return 0 on success
+}
+
+// Function to apply a faster 5x5 blur filter using separable filters
+int blur5x5_2(cv::Mat &src, cv::Mat &dst)
+{
+    if (src.empty() || src.channels() != 3)
+    {
+        return -1;
+    }
+
+    // Kernel
+    int kernel[5] = {1, 2, 4, 2, 1};
+    int kernelSum = 10; // Sum of kernel values for normalization
+
+    // Initialize destination image
+    dst = cv::Mat(src.size(), src.type());
+
+    // Temporary image for intermediate results
+    cv::Mat temp(src.size(), src.type());
+
+    // Apply horizontal blur
+    for (int y = 0; y < src.rows; y++)
+    {
+        for (int x = 2; x < src.cols - 2; x++)
+        {
+            int sumB = 0, sumG = 0, sumR = 0;
+            for (int k = -2; k <= 2; k++)
+            {
+                cv::Vec3b pixel = src.ptr<cv::Vec3b>(y)[x + k];
+                sumB += pixel[0] * kernel[k + 2];
+                sumG += pixel[1] * kernel[k + 2];
+                sumR += pixel[2] * kernel[k + 2];
+            }
+            temp.ptr<cv::Vec3b>(y)[x] = cv::Vec3b(sumB / kernelSum, sumG / kernelSum, sumR / kernelSum);
+        }
+    }
+
+    // Apply vertical blur
+    for (int y = 2; y < src.rows - 2; y++)
+    {
+        for (int x = 0; x < src.cols; x++)
+        {
+            int sumB = 0, sumG = 0, sumR = 0;
+            for (int k = -2; k <= 2; k++)
+            {
+                cv::Vec3b pixel = temp.ptr<cv::Vec3b>(y + k)[x];
+                sumB += pixel[0] * kernel[k + 2];
+                sumG += pixel[1] * kernel[k + 2];
+                sumR += pixel[2] * kernel[k + 2];
+            }
+            dst.ptr<cv::Vec3b>(y)[x] = cv::Vec3b(sumB / kernelSum, sumG / kernelSum, sumR / kernelSum);
+        }
+    }
+
+    return 0;
+}
+
+// Function to apply a 3x3 Sobel X filter
+int sobelX3x3(cv::Mat &src, cv::Mat &dst) {
+    if (src.empty() || src.channels() != 3) {
+        return -1;
+    }
+
+    dst = cv::Mat(src.size(), CV_16SC3);
+
+    // Sobel X kernel
+    int kernel[3] = {-1, 0, 1};
+
+    for (int y = 0; y < src.rows; y++) {
+        for (int x = 1; x < src.cols - 1; x++) {
+            cv::Vec3s sum(0, 0, 0);
+            for (int k = -1; k <= 1; k++) {
+                cv::Vec3b pixel = src.at<cv::Vec3b>(y, x + k);
+                sum[0] += pixel[0] * kernel[k + 1];
+                sum[1] += pixel[1] * kernel[k + 1];
+                sum[2] += pixel[2] * kernel[k + 1];
+            }
+            dst.at<cv::Vec3s>(y, x) = sum;
+        }
+    }
+
+    return 0;
+}
+
+// Function to apply a 3x3 Sobel Y filter
+int sobelY3x3(cv::Mat &src, cv::Mat &dst) {
+    if (src.empty() || src.channels() != 3) {
+        return -1;
+    }
+
+    dst = cv::Mat(src.size(), CV_16SC3);
+
+    // Sobel Y kernel
+    int kernel[3] = {-1, 0, 1};
+
+    for (int y = 1; y < src.rows - 1; y++) {
+        for (int x = 0; x < src.cols; x++) {
+            cv::Vec3s sum(0, 0, 0);
+            for (int k = -1; k <= 1; k++) {
+                cv::Vec3b pixel = src.at<cv::Vec3b>(y + k, x);
+                sum[0] += pixel[0] * kernel[k + 1];
+                sum[1] += pixel[1] * kernel[k + 1];
+                sum[2] += pixel[2] * kernel[k + 1];
+            }
+            dst.at<cv::Vec3s>(y, x) = sum;
+        }
+    }
+
+    return 0;
+}
+
+// Function to generate a gradient magnitude image from X and Y Sobel images
+int magnitude(cv::Mat &sx, cv::Mat &sy, cv::Mat &dst) {
+    if (sx.empty() || sy.empty() || sx.channels() != 3 || sy.channels() != 3) {
+        return -1;
+    }
+
+    // Initialize destination image
+    dst = cv::Mat(sx.size(), CV_8UC3);
+
+    // Calculate the gradient magnitude
+    for (int y = 0; y < sx.rows; y++) {
+        for (int x = 0; x < sx.cols; x++) {
+            cv::Vec3s sxPixel = sx.at<cv::Vec3s>(y, x);
+            cv::Vec3s syPixel = sy.at<cv::Vec3s>(y, x);
+            cv::Vec3b magnitudePixel;
+
+            for (int c = 0; c < 3; c++) {
+                // Calculate the magnitude
+                float mag = sqrt(sxPixel[c] * sxPixel[c] + syPixel[c] * syPixel[c]);
+                // Scale and convert to uchar
+                magnitudePixel[c] = static_cast<uchar>(std::min(mag, 255.0f));
+            }
+
+            dst.at<cv::Vec3b>(y, x) = magnitudePixel;
+        }
+    }
+
+    return 0;
+}
+
+// Function to blur and quantize a color image
+int blurQuantize(cv::Mat &src, cv::Mat &dst, int levels) {
+    if (src.empty() || src.channels() != 3 || levels <= 0) {
+        return -1;
+    }
+
+    // First, apply blur - you can use your existing blur function
+    cv::Mat blurredSrc;
+    blur5x5_2(src, blurredSrc);  // Or use another blur method if you have
+
+    // Initialize destination image
+    dst = cv::Mat(src.size(), src.type());
+
+    // Size of each quantization bucket
+    int bucketSize = 255 / levels;
+
+    // Quantize the image
+    for (int y = 0; y < blurredSrc.rows; y++) {
+        for (int x = 0; x < blurredSrc.cols; x++) {
+            cv::Vec3b pixel = blurredSrc.at<cv::Vec3b>(y, x);
+            cv::Vec3b quantizedPixel;
+
+            for (int c = 0; c < 3; c++) {
+                int quantizedValue = (pixel[c] / bucketSize) * bucketSize;
+                quantizedPixel[c] = static_cast<uchar>(quantizedValue);
+            }
+
+            dst.at<cv::Vec3b>(y, x) = quantizedPixel;
+        }
+    }
+
+    return 0;
+}
+
+int embossEffect(cv::Mat &src, cv::Mat &dst) {
+    // Convert source to grayscale
+    cv::Mat grey;
+    cvtColor(src, grey, cv::COLOR_BGR2GRAY);
+
+    // Apply Sobel filters in X and Y directions
+    cv::Mat sobelX, sobelY;
+    Sobel(grey, sobelX, CV_32F, 1, 0);
+    Sobel(grey, sobelY, CV_32F, 0, 1);
+
+    // Combine Sobel X and Y
+    cv::Mat emboss = 0.5 * sobelX + 0.5 * sobelY;
+
+    // Normalize and convert to 8-bit image
+    normalize(emboss, emboss, 0, 255, cv::NORM_MINMAX);
+    convertScaleAbs(emboss, dst);
+
+    return 0;
+}
+
+int colorfulFaceGrayscaleBackground(cv::Mat &src, cv::Mat &dst, std::vector<cv::Rect> &faces) {
+    if (src.empty()) {
+        return -1; // Return error if the source image is empty
+    }
+
+    // Create a color copy and a grayscale version of the source image
+    cv::Mat colorSrc = src.clone();
+    cv::cvtColor(src, dst, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(dst, dst, cv::COLOR_GRAY2BGR); // Convert grayscale to 3 channels
+
+    for (const auto &face : faces) {
+        colorSrc(face).copyTo(dst(face)); // Copy color face regions to grayscale image
+    }
+
+    return 0; // Return success
+}
+
+
+
