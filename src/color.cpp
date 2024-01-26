@@ -1,4 +1,4 @@
-// filter.cpp
+// color.cpp
 // Name: Mihir Chitre, Aditya Gurnani
 // Date: 01/23/2024
 // Purpose: Contains color picking functions
@@ -16,10 +16,10 @@ int main()
     VideoCapture cap(0);
     Mat img;
     Mat imgHSV, mask, imgColor;
-    int hmin = 0, smin = 0, vmin = 0;
-    int hmax = 179, smax = 255, vmax = 255;
+    int hmin = 0, smin = 0, vmin = 0; // Min HSV values
+    int hmax = 179, smax = 255, vmax = 255; // Max HSV values
 
-    namedWindow("Trackbars", (640, 200)); // Create Window
+    namedWindow("Trackbars", (640, 200)); // Creating Window for trackbars
     createTrackbar("Hue Min", "Trackbars", &hmin, 179);
     createTrackbar("Hue Max", "Trackbars", &hmax, 179);
     createTrackbar("Sat Min", "Trackbars", &smin, 255);
@@ -32,6 +32,7 @@ int main()
         cap.read(img);
         cvtColor(img, imgHSV, COLOR_BGR2HSV);
 
+        // Lower and Upper bounds for HSV filter
         Scalar lower(hmin, smin, vmin);
         Scalar upper(hmax, smax, vmax);
 
