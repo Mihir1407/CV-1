@@ -19,6 +19,23 @@ int magnitude(cv::Mat &sx, cv::Mat &sy, cv::Mat &dst);
 int blurQuantize(cv::Mat &src, cv::Mat &dst, int levels);
 int embossEffect(cv::Mat &src, cv::Mat &dst);
 int colorfulFaceGrayscaleBackground(cv::Mat &src, cv::Mat &dst, std::vector<cv::Rect> &faces);
+int thermalVisionEffect(const cv::Mat &src, cv::Mat &dst);
+cv::Point getContours(cv::Mat image);
+std::vector<std::vector<int>> findColor(cv::Mat img, const std::vector<std::vector<int>>& myColors);
+void paintMode(cv::Mat &img, std::vector<std::vector<int>> &newPoints, const std::vector<cv::Scalar> &myColorValues);
+void rainEffect(cv::Mat &frame, int intensity); 
+
+std::vector<std::vector<int>> myColors{ 
+    {105,102,0,164,255,153}, // Blue
+    {70,51,102,109,255,204}   // Green
+};
+std::vector<cv::Scalar> myColorValues{ 
+    {255,0,255},  // Blue
+    {0,255,0}     // Green 
+};
+
+int weatherType = 1; 
+int weatherIntensity = 5; // Default intensity
 
 // Function to get current time in milliseconds using chrono library
 double getTime()
@@ -89,7 +106,10 @@ int main(int argc, char *argv[])
     cv::namedWindow("Video", cv::WINDOW_AUTOSIZE);
     cv::Mat frame, processedFrame;
     std::vector<cv::Rect> faces; 
+    cv::Mat canvas = cv::Mat::zeros(refS, CV_8UC3);
+
     char mode = 'c';
+
 
     for (;;)
     {
@@ -115,7 +135,15 @@ int main(int argc, char *argv[])
                 cv::cvtColor(frame, grey, cv::COLOR_BGR2GRAY);
                 detectFaces(grey, faces);
             }
-
+            if (key == 'w') {
+            weatherType = (weatherType + 1) % 3; // Cycle through weather types
+            }
+            if (key == '1') {
+                weatherIntensity = std::min(weatherIntensity + 1, 10); // Increase intensity
+            }
+            if (key == '0') {
+                weatherIntensity = std::max(weatherIntensity - 1, 0); // Decrease intensity
+            }
             // Perform checks for brightness adjustment feature
             if (key == '+')
             {
@@ -192,6 +220,16 @@ int main(int argc, char *argv[])
         case 't': // Colorful face with grayscale background
             colorfulFaceGrayscaleBackground(frame, processedFrame, faces);
             break;
+        case 'r':  // Thermal vision effect
+            thermalVisionEffect(frame, processedFrame);
+            break;
+        case 'd': { // Drawing mode
+                auto newPoints = findColor(frame, myColors);  
+                paintMode(canvas, newPoints, myColorValues); 
+                processedFrame = frame.clone();
+                cv::addWeighted(processedFrame, 1, canvas, 1, 0, processedFrame);
+                break;
+            }
         default:
             processedFrame = frame.clone();
             break;
@@ -202,7 +240,9 @@ int main(int argc, char *argv[])
         {
             drawBoxes(processedFrame, faces); // Draw boxes around detected faces
         }
-
+        if (weatherType == 1) {
+            rainEffect(processedFrame, weatherIntensity);
+        } 
         // Perform brightness adjustment
         if (brightnessAdjustment != 0)
         {
