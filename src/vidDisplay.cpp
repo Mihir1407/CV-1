@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
                 cv::cvtColor(frame, grey, cv::COLOR_BGR2GRAY);
                 detectFaces(grey, faces);
             }
-            if (key == 'w') {
+            if (key == 'u') {
             weatherType = (weatherType + 1) % 3; // Cycle through weather types
             }
             if (key == '1') {
